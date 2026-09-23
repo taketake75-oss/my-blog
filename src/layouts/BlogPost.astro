@@ -20,45 +20,70 @@ const allPosts = (await getCollection('blog')).sort(
 	<head>
 		<BaseHead title={title} description={description} />
 		<style>
+			/* 全体コンテナ：スマホ表示時もはみ出さないレスポンシブ設計 */
 			.container {
+				width: 100%;
 				max-width: 1200px;
 				margin: 0 auto;
-				padding: 2em 1em;
+				padding: 1.5rem 1rem;
+				box-sizing: border-box;
 				display: grid;
 				grid-template-columns: 1fr;
 				gap: 2rem;
 			}
-			/* PC表示時に2カラム（本文 + サイドバー）化 */
 			@media (min-width: 900px) {
 				.container {
 					grid-template-columns: 1fr 300px;
+					padding: 2rem 1rem;
 				}
 			}
+
+			/* 本文エリア */
 			.main-content {
-				min-width: 0;
+				width: 100%;
+				min-width: 0; /* flex/grid内の文字溢れ防止 */
 			}
 			.title-section {
-				margin-bottom: 2em;
+				margin-bottom: 1.5em;
 				padding-bottom: 1em;
 				border-bottom: 1px solid #e2e8f0;
 				text-align: center;
 			}
 			.title-section h1 {
-				font-size: 1.8rem;
+				font-size: 1.5rem;
 				line-height: 1.4;
 				margin: 0.5em 0;
+				word-break: break-word; /* 長い単語の折り返し */
+			}
+			@media (min-width: 768px) {
+				.title-section h1 {
+					font-size: 2rem;
+				}
 			}
 			.date {
 				color: rgb(var(--gray));
-				font-size: 0.9rem;
+				font-size: 0.85rem;
 			}
-			.hero-image img {
+
+			/* 文章・マークダウン本文（商品カードや画像のはみ出しを防止） */
+			.prose {
 				width: 100%;
-				border-radius: 8px;
-				margin-bottom: 1.5em;
+				max-width: 100%;
+				overflow-wrap: break-word;
 			}
-			/* サイドバーのスタイル */
+			/* 埋め込まれたHTMLカードや画像のレスポンシブ強制適用 */
+			.prose :global(img) {
+				max-width: 100% !important;
+				height: auto !important;
+			}
+			.prose :global(div) {
+				max-width: 100% !important;
+				box-sizing: border-box !important;
+			}
+
+			/* サイドバー */
 			.sidebar {
+				width: 100%;
 				display: flex;
 				flex-direction: column;
 				gap: 1.5rem;
