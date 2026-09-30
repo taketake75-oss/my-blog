@@ -1,0 +1,131 @@
+---
+import { getCollection } from 'astro:content';
+import BaseHead from '../../../components/BaseHead.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import FormattedDate from '../../../components/FormattedDate.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../../../consts';
+
+export async function getStaticPaths() {
+	const posts = await getCollection('blog');
+	
+	// すべての記事からカテゴリーを重複なく抽出
+	const categories = [...new Set(posts.map((post) => post.data.category).filter(Boolean))];
+
+	return categories.map((category) => {
+		const filteredPosts = posts
+			.filter((post) => post.data.category === category)
+			.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+		return {
+			params: { category },
+			props: { posts: filteredPosts, categoryName: category },
+		};
+	});
+}
+
+const { posts, categoryName } = Astro.props;
+---
+
+<!doctype html>
+<html lang="ja">
+	<head>
+		<BaseHead title={`${categoryName} の記事一覧 - ${SITE_TITLE}`} description={SITE_DESCRIPTION} />
+		<style>
+			main {
+				width: 960px;
+				max-width: calc(100% - 2rem);
+				margin: 0 auto;
+				padding: 2rem 1rem;
+			}
+			.header-title {
+				margin-bottom: 2rem;
+				padding-bottom: 1rem;
+				border-bottom: 2px solid #e2e8f0;
+			}
+			.category-tag {
+				display: inline-block;
+				background-color: #eef2ff;
+				color: #4f46e5;
+				border: 1px solid #c7d2fe;
+				padding: 4px 14px;
+				border-radius: 16px;
+				font-size: 0.9rem;
+				font-weight: bold;
+				margin-bottom: 0.5rem;
+			}
+			ul {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+				gap: 2rem;
+				list-style-type: none;
+				margin: 0;
+				padding: 0;
+			}
+			ul li {
+				border: 1px solid #e2e8f0;
+				border-radius: 12px;
+				overflow: hidden;
+				transition: transform 0.2s, box-shadow 0.2s;
+				background: #fff;
+			}
+			ul li:hover {
+				transform: translateY(-4px);
+				box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+			}
+			ul li a {
+				display: block;
+				text-decoration: none;
+				color: inherit;
+				padding: 1.25rem;
+			}
+			.title {
+				font-size: 1.1rem;
+				font-weight: bold;
+				margin: 0.5rem 0;
+				line-height: 1.4;
+			}
+			.date {
+				font-size: 0.8rem;
+				color: rgb(var(--gray));
+			}
+			.back-link {
+				display: inline-block;
+				margin-top: 2rem;
+				color: #4f46e5;
+				text-decoration: none;
+				font-weight: bold;
+			}
+			.back-link:hover {
+				text-decoration: underline;
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="header-title">
+				<span class="category-tag">{categoryName}</span>
+				<h1>「{categoryName}」カテゴリーの記事一覧 ({posts.length}件)</h1>
+			</div>
+			<section>
+				<ul>
+					{
+						posts.map((post) => (
+							<li>
+								<a href={`/blog/${post.id}/`}>
+									<p class="date">
+										<FormattedDate date={post.data.pubDate} />
+									</p>
+									<h2 class="title">{post.data.title}</h2>
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</section>
+			<a href="/blog/" class="back-link">← 全記事一覧へ戻る</a>
+		</main>
+		<Footer />
+	</body>
+</html>

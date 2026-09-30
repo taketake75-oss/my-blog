@@ -1,0 +1,242 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+
+type Props = CollectionEntry<'blog'>['data'];
+
+const props = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, category } = props;
+
+const allPosts = (await getCollection('blog')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+
+// 重複のない全カテゴリーを取得（サイドバー用）
+const categories = [...new Set(allPosts.map((post) => post.data.category).filter(Boolean))];
+---
+
+<html lang="ja">
+	<head>
+		<BaseHead title={title} description={description} />
+		<style>
+			.container {
+				width: 100%;
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 1.5rem 1rem;
+				box-sizing: border-box;
+				display: grid;
+				grid-template-columns: 1fr;
+				gap: 2rem;
+			}
+			@media (min-width: 900px) {
+				.container {
+					grid-template-columns: 1fr 300px;
+					padding: 2rem 1rem;
+				}
+			}
+			.main-content {
+				width: 100%;
+				min-width: 0;
+			}
+			.title-section {
+				margin-bottom: 1.5em;
+				padding-bottom: 1em;
+				border-bottom: 1px solid #e2e8f0;
+				text-align: center;
+			}
+			.title-section h1 {
+				font-size: 1.5rem;
+				line-height: 1.4;
+				margin: 0.5em 0;
+				word-break: break-word;
+			}
+			@media (min-width: 768px) {
+				.title-section h1 {
+					font-size: 2rem;
+				}
+			}
+			.date {
+				color: rgb(var(--gray));
+				font-size: 0.85rem;
+			}
+			.category-badge {
+				display: inline-block;
+				background-color: #eef2ff;
+				color: #4f46e5;
+				border: 1px solid #c7d2fe;
+				padding: 4px 12px;
+				border-radius: 16px;
+				font-size: 0.85rem;
+				font-weight: bold;
+				margin-bottom: 0.5rem;
+				text-decoration: none;
+				transition: background-color 0.2s;
+			}
+			.category-badge:hover {
+				background-color: #e0e7ff;
+			}
+			.prose {
+				width: 100%;
+				max-width: 100%;
+				overflow-wrap: break-word;
+			}
+			.prose :global(img) {
+				max-width: 100% !important;
+				height: auto !important;
+			}
+			.prose :global(div) {
+				max-width: 100% !important;
+				box-sizing: border-box !important;
+			}
+			.sidebar {
+				width: 100%;
+				display: flex;
+				flex-direction: column;
+				gap: 1.5rem;
+			}
+			.widget {
+				background: #f8fafc;
+				border: 1px solid #e2e8f0;
+				border-radius: 12px;
+				padding: 1.25rem;
+			}
+			.widget-title {
+				font-size: 1.1rem;
+				font-weight: bold;
+				margin-top: 0;
+				margin-bottom: 1rem;
+				padding-bottom: 0.5rem;
+				border-bottom: 2px solid rgb(var(--accent));
+			}
+			.category-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+			.category-item {
+				display: inline-block;
+				background: #fff;
+				border: 1px solid #cbd5e1;
+				border-radius: 20px;
+				padding: 4px 12px;
+				font-size: 0.85rem;
+				color: #334155;
+				text-decoration: none;
+			}
+			.category-item:hover {
+				border-color: #4f46e5;
+				color: #4f46e5;
+			}
+			.post-list {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+			.post-list li {
+				margin-bottom: 0.8rem;
+				padding-bottom: 0.8rem;
+				border-bottom: 1px dashed #cbd5e1;
+			}
+			.post-list li:last-child {
+				margin-bottom: 0;
+				padding-bottom: 0;
+				border-bottom: none;
+			}
+			.post-list a {
+				text-decoration: none;
+				color: rgb(var(--black));
+				font-size: 0.9rem;
+				line-height: 1.4;
+				display: block;
+			}
+			.post-list a:hover {
+				color: rgb(var(--accent));
+			}
+			.post-date {
+				font-size: 0.75rem;
+				color: rgb(var(--gray));
+				display: block;
+				margin-top: 0.2rem;
+			}
+		</style>
+	</head>
+
+	<body>
+		<Header />
+		<div class="container">
+			<main class="main-content">
+				<article>
+					<div class="title-section">
+						<!-- カテゴリーバッジ（クリックで一覧へ遷移） -->
+						{category && (
+							<div>
+								<a href={`/blog/category/${category}/`} class="category-badge">
+									{category}
+								</a>
+							</div>
+						)}
+						<div class="date">
+							<FormattedDate date={pubDate} />
+							{
+								updatedDate && (
+									<div class="last-updated-on">
+										更新日: <FormattedDate date={updatedDate} />
+									</div>
+								)
+							}
+						</div>
+						<h1>{title}</h1>
+					</div>
+					{heroImage && <div class="hero-image"><img src={heroImage} alt="" /></div>}
+					<div class="prose">
+						<slot />
+					</div>
+				</article>
+			</main>
+
+			<aside class="sidebar">
+				<!-- カテゴリー一覧ウィジェット -->
+				{categories.length > 0 && (
+					<div class="widget">
+						<h3 class="widget-title">カテゴリー</h3>
+						<div class="category-list">
+							{categories.map((cat) => (
+								<a href={`/blog/category/${cat}/`} class="category-item">
+									{cat}
+								</a>
+							))}
+						</div>
+					</div>
+				)}
+
+				<!-- 最新記事ウィジェット -->
+				<div class="widget">
+					<h3 class="widget-title">最新・おすすめ記事</h3>
+					<ul class="post-list">
+						{
+							allPosts.map((post) => (
+								<li>
+									<a href={`/blog/${post.id}/`}>
+										{post.data.title}
+										<span class="post-date">
+											<FormattedDate date={post.data.pubDate} />
+										</span>
+									</a>
+								</li>
+							))
+						}
+					</ul>
+				</div>
+			</aside>
+		</div>
+		<Footer />
+	</body>
+</html>
