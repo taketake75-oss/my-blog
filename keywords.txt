@@ -1,3 +1,3 @@
-電気毛布 敷き 10月 おすすめ, src/content/blog/electric-blanket-bed-warm.md
-ヒーター 小型 脱衣所, src/content/blog/heater-small-bathroom.md
-加湿器 ハイブリッド 大容量, src/content/blog/humidifier-hybrid-large.md
+電気毛布 敷き 省エネ, src/content/blog/electric-blanket-energy-saving.md
+ロボット掃除機 安い お掃除ロボット, src/content/blog/robot-vacuum-budget-friendly.md
+ネックウォーマー 充電式 コードレス, src/content/blog/neck-warmer-rechargeable.md
