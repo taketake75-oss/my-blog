@@ -3,12 +3,12 @@ import time
 import csv
 import warnings
 import requests
+import difflib
 from datetime import datetime
 from dotenv import load_dotenv
 
 # .env ファイルの環境変数を読み込む
 load_dotenv()
-
 
 # Pythonバージョン等の不要な警告を非表示
 warnings.filterwarnings('ignore')
@@ -19,7 +19,6 @@ from google import genai
 # APIキー・各種ID設定
 # --------------------------------------------------
 
-# APIキー・各種ID設定（.env から安全に取得）
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 RAKUTEN_APP_ID = os.getenv("RAKUTEN_APP_ID")
@@ -30,17 +29,44 @@ RAKUTEN_SEARCH_URL = "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Sear
 
 
 # --------------------------------------------------
-# 1. 楽天商品検索API関数
+# 1-1. 類似商品判定・重複排除関数
+# --------------------------------------------------
+def is_similar_title(title1: str, title2: str, threshold: float = 0.55) -> bool:
+    """商品名タイトルが似すぎているか判定する（同一商品の別ショップ出店を排除）"""
+    t1 = "".join([c for c in title1 if c.isalnum()])
+    t2 = "".join([c for c in title2 if c.isalnum()])
+    ratio = difflib.SequenceMatcher(None, t1, t2).ratio()
+    return ratio > threshold
+
+def filter_unique_items(raw_items: list, target_count: int = 3) -> list:
+    """楽天APIから取得したリストから重複・酷似している商品を排除する"""
+    unique_items = []
+    for item in raw_items:
+        is_duplicate = False
+        for u_item in unique_items:
+            if is_similar_title(item["name"], u_item["name"]):
+                is_duplicate = True
+                break
+        if not is_duplicate:
+            unique_items.append(item)
+        if len(unique_items) >= target_count:
+            break
+    return unique_items
+
+
+# --------------------------------------------------
+# 1-2. 楽天商品検索API関数
 # --------------------------------------------------
 def fetch_rakuten_items(keyword: str, hits: int = 3):
     time.sleep(1.0)
 
+    # 類似除外を見越して少し多め(10件)に取得する
     params = {
         "applicationId": RAKUTEN_APP_ID,
         "accessKey": RAKUTEN_ACCESS_KEY,
         "affiliateId": RAKUTEN_AFFILIATE_ID,
         "keyword": keyword,
-        "hits": hits,
+        "hits": 10,
         "format": "json",
     }
 
@@ -50,33 +76,36 @@ def fetch_rakuten_items(keyword: str, hits: int = 3):
             return []
 
         data = res.json()
-        items = []
+        raw_items = []
         for item_data in data.get("Items", []):
             item = item_data["Item"]
-            items.append({
+            raw_items.append({
                 "name": item.get("itemName"),
                 "price": item.get("itemPrice"),
                 "affiliate_url": item.get("affiliateUrl"),
                 "image_url": item.get("mediumImageUrls", [{}])[0].get("imageUrl"),
                 "caption": item.get("itemCaption", "")[:150]
             })
-        return items
+        
+        # 重複・類似商品をフィルタリングして上位3件を取り出す
+        filtered_items = filter_unique_items(raw_items, target_count=hits)
+        return filtered_items
+
     except Exception as e:
         print(f"楽天APIエラー: {e}")
         return []
 
 
 # --------------------------------------------------
-# 2. LLM文章生成関数（安定版モデル指定 & 警告対策）
+# 2. LLM文章生成関数（プロンプト強化版）
 # --------------------------------------------------
 def generate_article_markdown(keyword: str, items: list) -> str:
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     products_context = ""
     for i, item in enumerate(items, 1):
-        products_context += f"\n商品{i}: {item['name']}\n価格: {item['price']}円\n概要: {item['caption']}\n"
+        products_context += f"\n【商品{i}】: {item['name']}\n価格: {item['price']}円\n概要: {item['caption']}\n"
 
-    # 今日の日付を取得 (例: "2026-09-25")
     today_str = datetime.now().strftime("%Y-%m-%d")
 
     prompt = f"""
@@ -101,6 +130,9 @@ category: "（適切なカテゴリー名）"
 2. 導入部分で読者の悩み（持ち運びや充電不足など）に共感してください。
 3. 「選び方のポイント（箇条書き）」を簡潔に解説してください。
 4. 各商品の解説パートでは、見出し（### ）に商品名を入れ、特徴やどんな人におすすめかを解説してください。
+   【重要な比較指示】
+   - 3つの商品は「コスパモデル」「多機能・上位モデル」「初心者・エントリーモデル」など、それぞれどのようなターゲットや場面に向いているかを明確に差別化して解説してください。
+   - 機能や特徴が近い商品が含まれている場合は、無理にまったく別物として扱わず、「予算重視の方」「保証や付属品重視の方」など、読者にとって役立つ切り口で比較を行ってください。
 5. 各商品の解説の末尾に、必ず以下のようにプレースホルダー（置き換え記号）を1行出力してください。
    - 商品1の末尾 -> [[PRODUCT_CARD_1]]
    - 商品2の末尾 -> [[PRODUCT_CARD_2]]
@@ -149,14 +181,14 @@ def build_product_card_html(item: dict) -> str:
     return f"""
 <div style="border: 1px solid #e0e0e0; padding: 15px; border-radius: 8px; margin: 20px 0; display: flex; flex-wrap: wrap; gap: 15px; background: #fff; max-width: 100%; box-sizing: border-box;">
         <div style="flex-shrink: 0; margin: 0 auto;">
-                <img src="{item['image_url']}" alt="{item['name']}" style="width: 120px; height: auto; border-radius: 4px; max-width: 100%;">
+            <img src="{item['image_url']}" alt="{item['name']}" style="width: 120px; height: auto; border-radius: 4px; max-width: 100%;">
         </div>
         <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; justify-content: space-between;">
-                <div style="font-weight: bold; font-size: 0.95em; color: #333; word-break: break-word;">{item['name']}</div>
-                <div style="color: #bf0000; font-weight: bold; margin-top: 5px;">価格：{item['price']:,}円</div>
-                <div style="margin-top: 10px;">
-                        <a href="{item['affiliate_url']}" target="_blank" rel="noopener sponsored" style="background: #bf0000; color: #fff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 0.85em; display: inline-block;">楽天市場で見る</a>
-                </div>
+            <div style="font-weight: bold; font-size: 0.95em; color: #333; word-break: break-word;">{item['name']}</div>
+            <div style="color: #bf0000; font-weight: bold; margin-top: 5px;">価格：{item['price']:,}円</div>
+            <div style="margin-top: 10px;">
+                <a href="{item['affiliate_url']}" target="_blank" rel="noopener sponsored" style="background: #bf0000; color: #fff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 0.85em; display: inline-block;">楽天市場で見る</a>
+            </div>
         </div>
 </div>
 """
@@ -170,12 +202,12 @@ def process_single_article(keyword: str, output_filename: str):
     print(f"🚀 記事生成開始: [{keyword}]")
     print(f"==========================================")
 
-    print(f"1. 楽天APIから「{keyword}」の商品情報を取得中...")
+    print(f"1. 楽天APIから「{keyword}」の商品情報を取得中（重複除外フィルタ適用）...")
     items = fetch_rakuten_items(keyword, hits=3)
     if not items:
         print("⚠️ スキップ: 商品データが取得できませんでした。キーワードを見直してください。")
         return
-    print(f"            -> 取得成功: {len(items)} 件の商品データを取得しました。")
+    print(f"            -> 取得成功: {len(items)} 件のユニーク商品データを取得しました。")
 
     print("2. Gemini APIで記事のMarkdown本文を生成中...")
     raw_markdown = generate_article_markdown(keyword, items)
