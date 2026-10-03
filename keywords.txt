@@ -1,3 +1,3 @@
-衣類乾燥機 小型 コンパクト, src/content/blog/clothes-dryer-small-compact.md
-フードプロセッサー 離乳食 時短, src/content/blog/food-processor-baby-food.md
-ヘアアイロン コードレス ミニ, src/content/blog/hair-iron-cordless-mini.md
+ヘアードライヤー 大風量 速乾, src/content/blog/hair-dryer-high-power.md
+電気毛布 敷き ぽカぽか, src/content/blog/electric-blanket-pad.md
+セラミックヒーター 人感センサー, src/content/blog/ceramic-heater-sensor.md
